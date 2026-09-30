@@ -1,0 +1,44 @@
+name: NPB Build Site
+
+# 只要你更新了 data/ 裡的文字檔(貼上先發預告或比分),就會自動重新計算並更新網站
+on:
+  push:
+    paths:
+      - 'data/matchups.txt'
+      - 'data/actual_results/**'
+      - 'data/standings.json'
+      - 'data/pitcher_ratings.json'
+      - 'data/injury_scores.json'
+      - 'npb_predictor.py'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: npb-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build site
+        run: python npb_predictor.py --site docs --no-open
+
+      - name: Commit and push results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/history docs
+          git diff --cached --quiet || git commit -m "Auto build: $(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M JST')"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push
